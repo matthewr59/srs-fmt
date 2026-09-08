@@ -1,0 +1,6 @@
+[package]
+name = "srs-fmt"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Normalizes messy spaced repetition scheduling exports into a canonical form"
