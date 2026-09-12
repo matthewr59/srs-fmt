@@ -46,6 +46,23 @@ fn detect_delimiter(line: &str) -> Option<char> {
         .find(|&d| line.split(d).count() >= 5)
 }
 
+/// Heuristic check for a header row such as "front,back,interval,ease,due_date".
+/// A genuine data row always has numeric interval and ease columns, so a row
+/// where *both* fail to parse as numbers is almost certainly a header and not
+/// a corrupted card. Only meant to be called against the first row of a file.
+pub fn looks_like_header(line: &str, lenient: bool) -> bool {
+    let delimiter = if lenient {
+        detect_delimiter(line).unwrap_or('\t')
+    } else {
+        '\t'
+    };
+    let fields: Vec<&str> = line.split(delimiter).map(|f| f.trim()).collect();
+    if fields.len() < 5 {
+        return false;
+    }
+    parse_interval(fields[2], true).is_err() && parse_ease(fields[3], true).is_err()
+}
+
 /// Parses one input row into a `Card`. Strict mode requires the canonical
 /// tab-separated, whitespace-clean, ISO-date shape exactly; lenient mode
 /// guesses a delimiter, trims fields, and accepts a few common date and

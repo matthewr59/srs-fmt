@@ -85,6 +85,7 @@ fn main() -> ExitCode {
     };
 
     let mut written = 0usize;
+    let mut checked_header = false;
 
     for (i, line) in reader.lines().enumerate() {
         let line_no = i + 1;
@@ -98,6 +99,14 @@ fn main() -> ExitCode {
 
         if line.trim().is_empty() {
             continue;
+        }
+
+        if !checked_header {
+            checked_header = true;
+            if card::looks_like_header(&line, args.lenient) {
+                eprintln!("srs-fmt: line {line_no}: skipped header row");
+                continue;
+            }
         }
 
         match parse_line(&line, args.lenient) {

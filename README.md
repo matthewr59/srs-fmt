@@ -22,6 +22,11 @@ front	back	interval_days	ease	due_date
 - `due_date` is `YYYY-MM-DD`, or empty for a card that has never been
   scheduled.
 
+If the first row looks like a header (its interval and ease columns aren't
+numbers, e.g. `front,back,interval,ease,due_date`), it's skipped with a note
+on stderr rather than being treated as a bad row. This check only ever
+applies to the first row of the file.
+
 ## Strict by default
 
 By default the formatter assumes the input is already close to canonical and
@@ -72,5 +77,6 @@ Reads from `INPUT` or stdin, writes to `OUTPUT` or stdout.
 
 ## Status
 
-Early skeleton. Parsing covers the five core fields; see the issue tracker
-for planned work on headers, richer date formats, and batch statistics.
+Early skeleton. Parsing covers the five core fields plus header detection;
+see the issue tracker for planned work on richer date formats and batch
+statistics.
