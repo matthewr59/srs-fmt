@@ -171,14 +171,82 @@ fn parse_due_date(raw: &str, lenient: bool) -> Result<String, ParseError> {
         }
         // Ambiguous slash/dot dates are assumed day-first, then tried
         // year-first as a fallback for exporters that write YYYY/MM/DD.
-        if let Some(d) = build_date(parts[2], parts[1], parts[0]) {
+        let year_if_day_first = expand_two_digit_year(parts[2]);
+        if let Some(d) = build_date(&year_if_day_first, parts[1], parts[0]) {
             return Ok(d);
         }
-        if let Some(d) = build_date(parts[0], parts[1], parts[2]) {
+        let year_if_year_first = expand_two_digit_year(parts[0]);
+        if let Some(d) = build_date(&year_if_year_first, parts[1], parts[2]) {
             return Ok(d);
         }
     }
+    if let Some(d) = try_month_name_date(raw) {
+        return Ok(d);
+    }
     Err(ParseError::BadDate(raw.to_string()))
+}
+
+// Two-digit years follow the same pivot strptime uses for %y: 00-68 is
+// treated as 2000-2068, 69-99 as 1969-1999. Anything else is left alone.
+fn expand_two_digit_year(y: &str) -> String {
+    if y.len() == 2 {
+        if let Ok(n) = y.parse::<u32>() {
+            let full = if n <= 68 { 2000 + n } else { 1900 + n };
+            return full.to_string();
+        }
+    }
+    y.to_string()
+}
+
+const MONTH_NAMES: [&str; 12] = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+];
+
+fn month_number(token: &str) -> Option<u32> {
+    let lower = token.to_ascii_lowercase();
+    let prefix: String = lower.chars().take(3).collect();
+    if prefix.chars().count() < 3 {
+        return None;
+    }
+    MONTH_NAMES
+        .iter()
+        .position(|m| m.starts_with(prefix.as_str()))
+        .map(|i| i as u32 + 1)
+}
+
+/// Handles dates with a month name, in either "12 Mar 2024" or
+/// "March 12, 2024" order, with a 2- or 4-digit year, separated by spaces
+/// or hyphens.
+fn try_month_name_date(raw: &str) -> Option<String> {
+    let cleaned = raw.replace(&['-', ','][..], " ");
+    let tokens: Vec<&str> = cleaned.split_whitespace().collect();
+    if tokens.len() != 3 {
+        return None;
+    }
+    let (month_idx, month) = tokens
+        .iter()
+        .enumerate()
+        .find_map(|(i, t)| month_number(t).map(|m| (i, m)))?;
+    let others: Vec<&str> = tokens
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != month_idx)
+        .map(|(_, t)| *t)
+        .collect();
+    let day = others[0];
+    let year = expand_two_digit_year(others[1]);
+    build_date(&year, &month.to_string(), day)
 }
 
 fn try_iso_date(raw: &str) -> Option<String> {

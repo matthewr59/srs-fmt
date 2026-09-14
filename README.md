@@ -59,7 +59,9 @@ Pass `--lenient` to accept the messier shapes that real exports produce
 instead of failing on them: the delimiter is guessed from `\t`, `;`, `,` or
 `|`; fields are trimmed; ease factors may be written as decimals with a
 comma or dot; and dates may use `/` or `.` separators (assumed day-first
-when ambiguous). Rows that still can't be parsed are skipped with a warning
+when ambiguous), a month name in either `12 Mar 2024` or `March 12, 2024`
+order, and a 2-digit year (`00`-`68` reads as `2000`-`2068`, `69`-`99` as
+`1969`-`1999`). Rows that still can't be parsed are skipped with a warning
 on stderr rather than aborting the whole file.
 
 ```
@@ -77,6 +79,7 @@ Reads from `INPUT` or stdin, writes to `OUTPUT` or stdout.
 
 ## Status
 
-Early skeleton. Parsing covers the five core fields plus header detection;
-see the issue tracker for planned work on richer date formats and batch
-statistics.
+Early skeleton. Parsing covers the five core fields, header detection, and
+lenient date handling for slash/dot/month-name formats with 2- or 4-digit
+years. Still no interval/ease shorthand, no automated tests, and no batch
+summary stats.
