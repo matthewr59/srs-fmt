@@ -128,14 +128,41 @@ fn parse_interval(raw: &str, lenient: bool) -> Result<u32, ParseError> {
     }
     // Spreadsheet exports often turn whole numbers into "3.0".
     let trimmed = raw.strip_suffix(".0").unwrap_or(raw);
-    trimmed
-        .parse::<u32>()
-        .map_err(|_| ParseError::BadInterval(raw.to_string()))
+    if let Ok(v) = trimmed.parse::<u32>() {
+        return Ok(v);
+    }
+    parse_interval_shorthand(trimmed).ok_or_else(|| ParseError::BadInterval(raw.to_string()))
+}
+
+// Some exporters write intervals as a count plus a calendar unit instead of
+// a day count, e.g. "3w" or "1mo". Month and year lengths are calendar
+// approximations (30 and 365 days) since the source data has no real
+// calendar to anchor them to.
+fn parse_interval_shorthand(raw: &str) -> Option<u32> {
+    let split_at = raw.find(|c: char| !c.is_ascii_digit())?;
+    let (digits, unit) = raw.split_at(split_at);
+    let count: u32 = digits.parse().ok()?;
+    let days_per_unit = match unit.trim().to_ascii_lowercase().as_str() {
+        "d" | "day" | "days" => 1,
+        "w" | "wk" | "week" | "weeks" => 7,
+        "mo" | "month" | "months" => 30,
+        "y" | "yr" | "year" | "years" => 365,
+        _ => return None,
+    };
+    count.checked_mul(days_per_unit)
 }
 
 fn parse_ease(raw: &str, lenient: bool) -> Result<u32, ParseError> {
     if !lenient {
         return raw.parse::<u32>().map_err(|_| ParseError::BadEase(raw.to_string()));
+    }
+    // Percentage notation, e.g. "250%", already matches the canonical
+    // ease*100 scale numerically.
+    if let Some(pct) = raw.strip_suffix('%') {
+        return pct
+            .trim()
+            .parse::<u32>()
+            .map_err(|_| ParseError::BadEase(raw.to_string()));
     }
     if let Ok(v) = raw.parse::<u32>() {
         return Ok(v);
