@@ -319,3 +319,175 @@ impl Card {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strict_parses_canonical_row() {
+        let card = parse_line("Capital of France?\tParis\t3\t250\t2024-03-12", false).unwrap();
+        assert_eq!(card.front, "Capital of France?");
+        assert_eq!(card.back, "Paris");
+        assert_eq!(card.interval_days, 3);
+        assert_eq!(card.ease, 250);
+        assert_eq!(card.due_date, "2024-03-12");
+    }
+
+    #[test]
+    fn strict_allows_empty_due_date() {
+        let card = parse_line("Front\tBack\t0\t250\t", false).unwrap();
+        assert_eq!(card.due_date, "");
+    }
+
+    #[test]
+    fn strict_rejects_wrong_field_count() {
+        let err = parse_line("Front\tBack\t3\t250", false).unwrap_err();
+        assert!(matches!(err, ParseError::WrongFieldCount(4)));
+    }
+
+    #[test]
+    fn strict_rejects_leading_whitespace() {
+        let err = parse_line(" Front\tBack\t3\t250\t2024-03-12", false).unwrap_err();
+        assert!(matches!(err, ParseError::Whitespace("front")));
+    }
+
+    #[test]
+    fn strict_rejects_semicolon_delimiter() {
+        let err = parse_line("Front;Back;3;250;2024-03-12", false).unwrap_err();
+        assert!(matches!(err, ParseError::WrongFieldCount(1)));
+    }
+
+    #[test]
+    fn strict_rejects_decimal_ease() {
+        let err = parse_line("Front\tBack\t3\t2.5\t2024-03-12", false).unwrap_err();
+        assert!(matches!(err, ParseError::BadEase(_)));
+    }
+
+    #[test]
+    fn strict_rejects_slash_date() {
+        let err = parse_line("Front\tBack\t3\t250\t12/03/2024", false).unwrap_err();
+        assert!(matches!(err, ParseError::BadDate(_)));
+    }
+
+    #[test]
+    fn strict_rejects_empty_front() {
+        let err = parse_line("\tBack\t3\t250\t2024-03-12", false).unwrap_err();
+        assert!(matches!(err, ParseError::EmptyField("front")));
+    }
+
+    #[test]
+    fn lenient_trims_and_picks_semicolon_delimiter() {
+        let card = parse_line(" Front ;Back;3;250;2024-03-12", true).unwrap();
+        assert_eq!(card.front, "Front");
+        assert_eq!(card.interval_days, 3);
+    }
+
+    #[test]
+    fn lenient_drops_trailing_empty_field() {
+        let card = parse_line("Front;Back;3;250;2024-03-12;", true).unwrap();
+        assert_eq!(card.due_date, "2024-03-12");
+    }
+
+    #[test]
+    fn lenient_accepts_decimal_ease_with_comma() {
+        let card = parse_line("Front\tBack\t3\t2,5\t2024-03-12", true).unwrap();
+        assert_eq!(card.ease, 250);
+    }
+
+    #[test]
+    fn lenient_accepts_decimal_ease_with_dot() {
+        let card = parse_line("Front\tBack\t3\t2.5\t2024-03-12", true).unwrap();
+        assert_eq!(card.ease, 250);
+    }
+
+    #[test]
+    fn lenient_accepts_percent_ease() {
+        let card = parse_line("Front\tBack\t3\t250%\t2024-03-12", true).unwrap();
+        assert_eq!(card.ease, 250);
+    }
+
+    #[test]
+    fn lenient_accepts_float_interval() {
+        let card = parse_line("Front\tBack\t3.0\t250\t2024-03-12", true).unwrap();
+        assert_eq!(card.interval_days, 3);
+    }
+
+    #[test]
+    fn lenient_accepts_interval_shorthand() {
+        let card = parse_line("Front\tBack\t3w\t250\t2024-03-12", true).unwrap();
+        assert_eq!(card.interval_days, 21);
+        let card = parse_line("Front\tBack\t1mo\t250\t2024-03-12", true).unwrap();
+        assert_eq!(card.interval_days, 30);
+        let card = parse_line("Front\tBack\t2y\t250\t2024-03-12", true).unwrap();
+        assert_eq!(card.interval_days, 730);
+    }
+
+    #[test]
+    fn lenient_accepts_slash_date_day_first() {
+        let card = parse_line("Front\tBack\t3\t250\t12/03/2024", true).unwrap();
+        assert_eq!(card.due_date, "2024-03-12");
+    }
+
+    #[test]
+    fn lenient_accepts_dot_date_year_first() {
+        let card = parse_line("Front\tBack\t3\t250\t2024.03.12", true).unwrap();
+        assert_eq!(card.due_date, "2024-03-12");
+    }
+
+    #[test]
+    fn lenient_accepts_two_digit_year() {
+        let card = parse_line("Front\tBack\t3\t250\t12/03/24", true).unwrap();
+        assert_eq!(card.due_date, "2024-03-12");
+        let card = parse_line("Front\tBack\t3\t250\t12/03/95", true).unwrap();
+        assert_eq!(card.due_date, "1995-03-12");
+    }
+
+    #[test]
+    fn lenient_accepts_month_name_day_first() {
+        let card = parse_line("Front\tBack\t3\t250\t12 Mar 2024", true).unwrap();
+        assert_eq!(card.due_date, "2024-03-12");
+    }
+
+    #[test]
+    fn lenient_accepts_month_name_month_first() {
+        let card = parse_line("Front\tBack\t3\t250\tMarch 12, 2024", true).unwrap();
+        assert_eq!(card.due_date, "2024-03-12");
+    }
+
+    #[test]
+    fn lenient_rejects_unparseable_row() {
+        let err = parse_line("Front\tBack\tbad\t250\t2024-03-12", true).unwrap_err();
+        assert!(matches!(err, ParseError::BadInterval(_)));
+    }
+
+    #[test]
+    fn header_row_detected_in_strict_mode() {
+        assert!(looks_like_header(
+            "front\tback\tinterval\tease\tdue_date",
+            false
+        ));
+    }
+
+    #[test]
+    fn header_row_detected_in_lenient_mode_with_commas() {
+        assert!(looks_like_header(
+            "front,back,interval,ease,due_date",
+            true
+        ));
+    }
+
+    #[test]
+    fn data_row_not_mistaken_for_header() {
+        assert!(!looks_like_header(
+            "Front\tBack\t3\t250\t2024-03-12",
+            false
+        ));
+    }
+
+    #[test]
+    fn to_line_round_trips_canonical_shape() {
+        let card = parse_line("Front\tBack\t3\t250\t2024-03-12", false).unwrap();
+        assert_eq!(card.to_line(), "Front\tBack\t3\t250\t2024-03-12");
+    }
+}

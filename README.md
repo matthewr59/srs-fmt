@@ -84,5 +84,6 @@ Reads from `INPUT` or stdin, writes to `OUTPUT` or stdout.
 
 Early skeleton. Parsing covers the five core fields, header detection,
 lenient date handling for slash/dot/month-name formats with 2- or 4-digit
-years, and lenient interval/ease shorthand. Still no automated tests, no
-batch summary stats, and no support for merging multiple input files.
+years, and lenient interval/ease shorthand, with unit tests covering both
+the strict and lenient paths. Still no batch summary stats and no support
+for merging multiple input files.
