@@ -42,6 +42,12 @@ fn parse_args() -> Result<Args, String> {
     })
 }
 
+fn print_summary(parsed: usize, header_skipped: usize, errors: usize) {
+    eprintln!(
+        "srs-fmt: {parsed} row(s) parsed, {header_skipped} header row(s) skipped, {errors} error(s)"
+    );
+}
+
 fn print_help() {
     println!("srs-fmt - normalize spaced repetition scheduling data\n");
     println!("Usage: srs-fmt [--lenient] [-o OUTPUT] [INPUT]\n");
@@ -85,6 +91,8 @@ fn main() -> ExitCode {
     };
 
     let mut written = 0usize;
+    let mut header_skipped = 0usize;
+    let mut errors = 0usize;
     let mut checked_header = false;
 
     for (i, line) in reader.lines().enumerate() {
@@ -93,6 +101,7 @@ fn main() -> ExitCode {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("srs-fmt: line {line_no}: read error: {e}");
+                print_summary(written, header_skipped, errors + 1);
                 return ExitCode::FAILURE;
             }
         };
@@ -105,6 +114,7 @@ fn main() -> ExitCode {
             checked_header = true;
             if card::looks_like_header(&line, args.lenient) {
                 eprintln!("srs-fmt: line {line_no}: skipped header row");
+                header_skipped += 1;
                 continue;
             }
         }
@@ -113,20 +123,26 @@ fn main() -> ExitCode {
             Ok(card) => {
                 if writeln!(writer, "{}", card.to_line()).is_err() {
                     eprintln!("srs-fmt: failed writing output");
+                    print_summary(written, header_skipped, errors);
                     return ExitCode::FAILURE;
                 }
                 written += 1;
             }
             Err(e) if args.lenient => {
                 eprintln!("srs-fmt: line {line_no}: skipped ({e})");
+                errors += 1;
             }
             Err(e) => {
                 eprintln!("srs-fmt: line {line_no}: {e}");
                 eprintln!("srs-fmt: pass --lenient to salvage what can be parsed");
+                errors += 1;
+                print_summary(written, header_skipped, errors);
                 return ExitCode::FAILURE;
             }
         }
     }
+
+    print_summary(written, header_skipped, errors);
 
     if written == 0 {
         eprintln!("srs-fmt: no valid rows produced");

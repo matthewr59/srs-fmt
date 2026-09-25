@@ -70,7 +70,12 @@ file.
 ```
 $ cargo run -- --lenient messy.csv
 What is the capital of France?	Paris	3	250	2024-03-12
+srs-fmt: 1 row(s) parsed, 0 header row(s) skipped, 0 error(s)
 ```
+
+Every run prints a one-line summary to stderr once it finishes (or hits the
+row that stopped it in strict mode): how many rows were written, how many
+header rows were skipped, and how many rows had errors.
 
 ## Usage
 
@@ -85,5 +90,6 @@ Reads from `INPUT` or stdin, writes to `OUTPUT` or stdout.
 Early skeleton. Parsing covers the five core fields, header detection,
 lenient date handling for slash/dot/month-name formats with 2- or 4-digit
 years, and lenient interval/ease shorthand, with unit tests covering both
-the strict and lenient paths. Still no batch summary stats and no support
-for merging multiple input files.
+the strict and lenient paths. Every run ends with a summary of rows parsed,
+header rows skipped, and errors. Still no support for merging multiple
+input files.
